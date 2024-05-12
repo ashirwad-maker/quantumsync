@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/ashirwad-maker/quantumsync/p2p"
@@ -14,6 +15,12 @@ func main() {
 	}
 
 	tr := p2p.NewTCPTransport(tcpOpts)
+
+	go func() {
+		msg := <-tr.Consume()
+		fmt.Printf("%+v\n", msg)
+	}()
+
 	if err := tr.ListenAndAccept(); err != nil {
 		log.Fatal(err)
 	}

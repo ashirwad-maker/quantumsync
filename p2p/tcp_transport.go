@@ -25,6 +25,11 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	}
 }
 
+// Close() implements the peer interface
+func (peer TCPPeer) Close() error {
+	return peer.conn.Close()
+}
+
 type TCTTransportOpts struct {
 	// Exported fields.
 	ListenAddr    string
@@ -34,18 +39,23 @@ type TCTTransportOpts struct {
 
 type TCPTransport struct {
 	TCTTransportOpts // Using strcture embedding.
-	//listenAddress string ----> moved to TCPTransportOpts
-	//	handshakeFunc HandshakeFunc ----> moved to TCPTransportOpts
-	// decoder       Decoder ----> moved to TCPTransportOpts
-	listener net.Listener
-	mu       sync.RWMutex
-	peers    map[net.Addr]Peer
+	rpcch            chan RPC
+	listener         net.Listener
+	mu               sync.RWMutex
+	peers            map[net.Addr]Peer
 }
 
 func NewTCPTransport(opts TCTTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCTTransportOpts: opts,
+		rpcch:            make(chan RPC),
 	}
+}
+
+// Consume() only reads from the channel for reading the incoming message
+// from another peer in the network and implements the Transport Interface.
+func (t *TCPTransport) Consume() <-chan RPC {
+	return t.rpcch
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
@@ -71,8 +81,6 @@ func (t *TCPTransport) startAccepLoop() {
 	}
 }
 
-type Temp struct{}
-
 func (t *TCPTransport) handleConn(conn net.Conn) {
 	peer := NewTCPPeer(conn, true)
 
@@ -83,7 +91,7 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 	}
 
 	// Read Loop
-	msg := &Message{}
+	rpc := RPC{}
 	// buff := make([]byte, 2000)
 	for {
 		// n, err := conn.Read(buff)
@@ -92,11 +100,14 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 		// }
 		// fmt.Printf("message: %v\n", string(buff[:n]))
 
-		if err := t.Decoder.Decode(conn, msg); err != nil {
+		if err := t.Decoder.Decode(conn, &rpc); err != nil {
 			fmt.Printf("TCP error:  %s\n", err)
 			continue
 		}
-		fmt.Printf("message : %v\n", msg)
+		rpc.From = conn.RemoteAddr() // Storing the address of a endpoint in the network
+		t.rpcch <- rpc
+
+		// fmt.Printf("message : %+v\n", rpc)
 	}
 
 }
