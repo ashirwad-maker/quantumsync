@@ -25,25 +25,32 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	}
 }
 
-type TCPTransport struct {
-	listenAddress string
-	listener      net.Listener
-	handshakeFunc HandshakeFunc
-
-	mu    sync.RWMutex
-	peers map[net.Addr]Peer
+type TCTTransportOpts struct {
+	// Exported fields.
+	ListenAddr    string
+	HandshakeFunc HandshakeFunc
+	Decoder       Decoder
 }
 
-func NewTCPTransport(listenAddr string) *TCPTransport {
+type TCPTransport struct {
+	TCTTransportOpts // Using strcture embedding.
+	//listenAddress string ----> moved to TCPTransportOpts
+	//	handshakeFunc HandshakeFunc ----> moved to TCPTransportOpts
+	// decoder       Decoder ----> moved to TCPTransportOpts
+	listener net.Listener
+	mu       sync.RWMutex
+	peers    map[net.Addr]Peer
+}
+
+func NewTCPTransport(opts TCTTransportOpts) *TCPTransport {
 	return &TCPTransport{
-		listenAddress: listenAddr,
-		handshakeFunc: func(any) error { return nil },
+		TCTTransportOpts: opts,
 	}
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
-	t.listener, err = net.Listen("tcp", t.listenAddress)
+	t.listener, err = net.Listen("tcp", t.ListenAddr)
 	if err != nil {
 		return err
 	}
@@ -59,11 +66,37 @@ func (t *TCPTransport) startAccepLoop() {
 		if err != nil {
 			fmt.Printf("TCP accept error %s", err)
 		}
+		fmt.Printf("New Incoming Connection %+v\n", conn)
 		go t.handleConn(conn)
 	}
 }
 
+type Temp struct{}
+
 func (t *TCPTransport) handleConn(conn net.Conn) {
 	peer := NewTCPPeer(conn, true)
-	fmt.Printf("New Incoming Connection %+v\n", peer)
+
+	if err := t.HandshakeFunc(peer); err != nil {
+		conn.Close()
+		fmt.Printf("TCP handshake error: %s\n", err)
+		return
+	}
+
+	// Read Loop
+	msg := &Message{}
+	// buff := make([]byte, 2000)
+	for {
+		// n, err := conn.Read(buff)
+		// if err != nil {
+		// 	fmt.Printf("TCP error : %s\n", err)
+		// }
+		// fmt.Printf("message: %v\n", string(buff[:n]))
+
+		if err := t.Decoder.Decode(conn, msg); err != nil {
+			fmt.Printf("TCP error:  %s\n", err)
+			continue
+		}
+		fmt.Printf("message : %v\n", msg)
+	}
+
 }
