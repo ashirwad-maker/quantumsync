@@ -3,7 +3,6 @@ package p2p
 import (
 	"fmt"
 	"net"
-	"sync"
 )
 
 // TCPPeer represents the remote node over a estabilished connection.
@@ -30,19 +29,22 @@ func (peer TCPPeer) Close() error {
 	return peer.conn.Close()
 }
 
+// The OnPeer() notifies the server what needs to be done with a new peer
+// attaching to the server.(cache, drop, etc...)
+// Here if the OnPeer() returns error we drop the connection.
+
 type TCTTransportOpts struct {
 	// Exported fields.
 	ListenAddr    string
 	HandshakeFunc HandshakeFunc
 	Decoder       Decoder
+	OnPeer        func(Peer) error
 }
 
 type TCPTransport struct {
 	TCTTransportOpts // Using strcture embedding.
 	rpcch            chan RPC
 	listener         net.Listener
-	mu               sync.RWMutex
-	peers            map[net.Addr]Peer
 }
 
 func NewTCPTransport(opts TCTTransportOpts) *TCPTransport {
@@ -82,27 +84,38 @@ func (t *TCPTransport) startAccepLoop() {
 }
 
 func (t *TCPTransport) handleConn(conn net.Conn) {
+	var err error
+	defer func() {
+		fmt.Printf("Dropping Peer connection: %s\n", err)
+		conn.Close()
+	}()
+
 	peer := NewTCPPeer(conn, true)
 
-	if err := t.HandshakeFunc(peer); err != nil {
-		conn.Close()
+	// First the handshake is called, if the handshake is successful then we will
+	// check the t.OnPeer() if that is also fine then we will go in the Read Loop()
+	// If either of them fails we will drop the connection.
+
+	if err = t.HandshakeFunc(peer); err != nil {
 		fmt.Printf("TCP handshake error: %s\n", err)
 		return
 	}
 
+	if t.OnPeer != nil {
+		if err = t.OnPeer(peer); err != nil {
+			return
+		}
+	}
+
 	// Read Loop
 	rpc := RPC{}
-	// buff := make([]byte, 2000)
 	for {
-		// n, err := conn.Read(buff)
-		// if err != nil {
-		// 	fmt.Printf("TCP error : %s\n", err)
-		// }
-		// fmt.Printf("message: %v\n", string(buff[:n]))
-
-		if err := t.Decoder.Decode(conn, &rpc); err != nil {
+		// If the peer is closed then this loop should end/return
+		// otherwise if it is a decoder error then it should be keep on going.
+		err = t.Decoder.Decode(conn, &rpc)
+		if err != nil {
 			fmt.Printf("TCP error:  %s\n", err)
-			continue
+			return
 		}
 		rpc.From = conn.RemoteAddr() // Storing the address of a endpoint in the network
 		t.rpcch <- rpc
