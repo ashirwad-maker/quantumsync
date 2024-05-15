@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"strings"
@@ -43,6 +44,16 @@ type Pathkey struct {
 	Filename string
 }
 
+// This function is required as os.RemoveAll() removes the folder and all its childern,
+// so this functions gives the folder where the storage starts.
+func (p Pathkey) FirstPathName() string {
+	paths := strings.Split(p.PathName, "/")
+	if len(paths) == 0 {
+		return ""
+	}
+	return paths[0]
+}
+
 func (p Pathkey) FullPath() string {
 	return fmt.Sprintf("%s/%s", p.PathName, p.Filename)
 }
@@ -51,8 +62,11 @@ type StoreOpts struct {
 	PathTansformFunc PathTansformFunc
 }
 
-var DefaultPathTransformFunc = func(key string) string {
-	return key
+var DefaultPathTransformFunc = func(key string) Pathkey {
+	return Pathkey{
+		PathName: key,
+		Filename: key,
+	}
 }
 
 type Store struct {
@@ -60,12 +74,34 @@ type Store struct {
 }
 
 func NewStore(opts StoreOpts) *Store {
+	if opts.PathTansformFunc == nil {
+		opts.PathTansformFunc = DefaultPathTransformFunc
+	}
 	return &Store{
 		StoreOpts: opts,
 	}
 }
 
-func (s *Store) read(key string) (io.Reader, error) {
+func (s *Store) Delete(key string) error {
+	pathKey := s.PathTansformFunc(key)
+	defer func() {
+		log.Printf("delted [%s] from disk", pathKey.Filename)
+	}()
+
+	return os.RemoveAll(pathKey.FirstPathName())
+}
+
+func (s *Store) Has(key string) bool {
+	pathKey := s.PathTansformFunc(key)
+
+	_, err := os.Stat(pathKey.FullPath())
+	if err == fs.ErrNotExist {
+		return false
+	}
+	return true
+}
+
+func (s *Store) Read(key string) (io.Reader, error) {
 	f, err := s.readStream(key)
 	if err != nil {
 		return nil, err
@@ -99,7 +135,7 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 	if err != nil {
 		return err
 	}
-
+	f.Close()
 	log.Printf("written (%d) bytes to disk : %s", n, fullPath)
 
 	return nil
