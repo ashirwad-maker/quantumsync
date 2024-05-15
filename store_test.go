@@ -22,11 +22,7 @@ func TestPathTransformFunc(t *testing.T) {
 }
 
 func TestStoreDeleteKey(t *testing.T) {
-	opts := StoreOpts{
-		PathTansformFunc: CASPathTransformFunc,
-	}
-	s := NewStore(opts)
-
+	s := newStore()
 	key := "myspecialpicture"
 	data := []byte("some jpeg bytes")
 	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
@@ -37,26 +33,58 @@ func TestStoreDeleteKey(t *testing.T) {
 	}
 }
 
+// TestStore function is responsible for testing the whole store.go functionalities
+// 50 times with different keys.
 func TestStore(t *testing.T) {
 	opts := StoreOpts{
 		PathTansformFunc: CASPathTransformFunc,
 	}
 	s := NewStore(opts)
 
-	key := "myspecialpicture"
-	data := []byte("some jpeg bytes")
-	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+	defer teardown(t, s)
+	for count := 0; count < 50; count++ {
+
+		key := fmt.Sprintf("myspecialpicture %d", count)
+		data := []byte("some jpeg bytes")
+		if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+			t.Error(err)
+		}
+
+		if ok := s.Has(key); !ok {
+			t.Errorf("expected to have the key %s", key)
+		}
+
+		r, err := s.Read(key)
+		if err != nil {
+			t.Error(err)
+		}
+		b, _ := ioutil.ReadAll(r)
+
+		if string(b) != string(data) {
+			t.Errorf("want %s have %s", string(data), string(b))
+		}
+		// fmt.Println(string(b))
+		if err := s.Delete(key); err != nil {
+			t.Error(err)
+		}
+
+		if ok := s.Has(key); ok {
+			t.Errorf("expected to NOT have the key: %s", key)
+		}
+	}
+
+}
+
+func newStore() *Store {
+	opts := StoreOpts{
+		PathTansformFunc: CASPathTransformFunc,
+	}
+	return NewStore(opts)
+
+}
+
+func teardown(t *testing.T, s *Store) {
+	if err := s.Clear(); err != nil {
 		t.Error(err)
 	}
-	r, err := s.Read(key)
-	if err != nil {
-		t.Error(err)
-	}
-	b, _ := ioutil.ReadAll(r)
-
-	if string(b) != string(data) {
-		t.Errorf("want %s have %s", string(data), string(b))
-	}
-	s.Delete(key)
-
 }
