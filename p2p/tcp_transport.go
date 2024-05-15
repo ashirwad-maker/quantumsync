@@ -1,7 +1,9 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
+	"log"
 	"net"
 )
 
@@ -33,7 +35,7 @@ func (peer TCPPeer) Close() error {
 // attaching to the server.(cache, drop, etc...)
 // Here if the OnPeer() returns error we drop the connection.
 
-type TCTTransportOpts struct {
+type TCPTransportOpts struct {
 	// Exported fields.
 	ListenAddr    string
 	HandshakeFunc HandshakeFunc
@@ -42,14 +44,14 @@ type TCTTransportOpts struct {
 }
 
 type TCPTransport struct {
-	TCTTransportOpts // Using strcture embedding.
+	TCPTransportOpts // Using strcture embedding.
 	rpcch            chan RPC
 	listener         net.Listener
 }
 
-func NewTCPTransport(opts TCTTransportOpts) *TCPTransport {
+func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
-		TCTTransportOpts: opts,
+		TCPTransportOpts: opts,
 		rpcch:            make(chan RPC),
 	}
 }
@@ -60,6 +62,10 @@ func (t *TCPTransport) Consume() <-chan RPC {
 	return t.rpcch
 }
 
+func (t *TCPTransport) Close() error {
+	return t.listener.Close()
+}
+
 func (t *TCPTransport) ListenAndAccept() error {
 	var err error
 	t.listener, err = net.Listen("tcp", t.ListenAddr)
@@ -67,14 +73,19 @@ func (t *TCPTransport) ListenAndAccept() error {
 		return err
 	}
 
-	go t.startAccepLoop()
+	go t.startAcceptLoop()
+	log.Printf("TCP transport listening on port : %s\n", t.ListenAddr)
 	return nil
 
 }
 
-func (t *TCPTransport) startAccepLoop() {
+func (t *TCPTransport) startAcceptLoop() {
 	for {
 		conn, err := t.listener.Accept()
+		if errors.Is(err, net.ErrClosed) {
+			return
+		}
+
 		if err != nil {
 			fmt.Printf("TCP accept error %s", err)
 		}

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"time"
 
 	"github.com/ashirwad-maker/quantumsync/p2p"
 )
@@ -11,28 +11,39 @@ func OnPeer(peer p2p.Peer) error {
 	// This loses the connection
 	//return fmt.Errorf("failed the onPeer func")
 	// OR
-	peer.Close()
+	// peer.Close()
 	// fmt.Println("doing some logic with peer outside of TCPTransport")
 	return nil
 }
 
 func main() {
-	tcpOpts := p2p.TCTTransportOpts{
+	tcpOpts := p2p.TCPTransportOpts{
 		ListenAddr:    ":3000",
 		HandshakeFunc: p2p.NOPhandshakeFunc,
 		Decoder:       p2p.DefaultDecoder{},
-		OnPeer:        OnPeer,
+		// OnPeer:        OnPeer,
 	}
 
 	tr := p2p.NewTCPTransport(tcpOpts)
 
+	fileServerOpts := FileServerOpts{
+		StorageRoot:      ":3000_network",
+		PathTansformFunc: CASPathTransformFunc,
+		Transport:        tr,
+	}
+	s := NewFileServer(fileServerOpts)
+
+	// go func() {
+	// 	msg := <-tr.Consume()
+	// 	fmt.Printf("%+v\n", msg)
+	// }()
 	go func() {
-		msg := <-tr.Consume()
-		fmt.Printf("%+v\n", msg)
+		time.Sleep(time.Second * 10)
+		s.Stop()
 	}()
 
-	if err := tr.ListenAndAccept(); err != nil {
+	if err := s.Start(); err != nil {
 		log.Fatal(err)
 	}
-	select {}
+
 }
