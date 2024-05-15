@@ -1,15 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"strings"
 )
 
-func CASPathTransformFunc(key string) string {
+func CASPathTransformFunc(key string) Pathkey {
 	hash := sha1.Sum([]byte(key))
 
 	// sha1.Sum() returns a [20]byte array and to convert it to a
@@ -18,18 +20,32 @@ func CASPathTransformFunc(key string) string {
 
 	blockSize := 5
 	sliceLength := len(hashStr) / blockSize
+	fmt.Println(hashStr)
 
-	// Converting a key to blocksize(5) number of folders
-	// and finally merging them to create a path .
+	// Converting a key number of folders and finally merging them to create a path .
 	paths := make([]string, sliceLength)
 	for i := 0; i < sliceLength; i++ {
-		to, from := i*blockSize, (i+1)*blockSize
-		paths[i] = hashStr[to:from]
+		from, to := i*blockSize, (i+1)*blockSize
+		paths[i] = hashStr[from:to]
 	}
-	return strings.Join(paths, "/")
+
+	return Pathkey{
+		PathName: strings.Join(paths, "/"),
+		Filename: hashStr,
+	}
+
 }
 
-type PathTansformFunc func(string) string
+type PathTansformFunc func(string) Pathkey
+
+type Pathkey struct {
+	PathName string
+	Filename string
+}
+
+func (p Pathkey) FullPath() string {
+	return fmt.Sprintf("%s/%s", p.PathName, p.Filename)
+}
 
 type StoreOpts struct {
 	PathTansformFunc PathTansformFunc
@@ -49,16 +65,33 @@ func NewStore(opts StoreOpts) *Store {
 	}
 }
 
-func (s *Store) writeStream(key string, r io.Reader) error {
-	pathName := s.PathTansformFunc(key)
+func (s *Store) read(key string) (io.Reader, error) {
+	f, err := s.readStream(key)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-	if err := os.MkdirAll(pathName, os.ModePerm); err != nil {
+	buff := new(bytes.Buffer)
+	_, err = io.Copy(buff, f)
+
+	return buff, err
+}
+
+func (s *Store) readStream(key string) (io.ReadCloser, error) {
+	pathkey := s.PathTansformFunc(key)
+	return os.Open(pathkey.FullPath())
+}
+
+func (s *Store) writeStream(key string, r io.Reader) error {
+	pathKey := s.PathTansformFunc(key)
+
+	if err := os.MkdirAll(pathKey.PathName, os.ModePerm); err != nil {
 		return err
 	}
-	fileName := "someFileName"
-	pathAndFileName := pathName + "/" + fileName
+	fullPath := pathKey.FullPath()
 
-	f, err := os.Create(pathAndFileName)
+	f, err := os.Create(fullPath)
 	if err != nil {
 		return err
 	}
@@ -67,7 +100,7 @@ func (s *Store) writeStream(key string, r io.Reader) error {
 		return err
 	}
 
-	log.Printf("written (%d) bytes to disk : %s", n, pathAndFileName)
+	log.Printf("written (%d) bytes to disk : %s", n, fullPath)
 
 	return nil
 }
