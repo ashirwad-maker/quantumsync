@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"log"
 	"time"
 
@@ -16,34 +17,52 @@ func OnPeer(peer p2p.Peer) error {
 	return nil
 }
 
-func main() {
+func makeServer(listenAddr string, nodes ...string) *FileServer {
 	tcpOpts := p2p.TCPTransportOpts{
-		ListenAddr:    ":3000",
+		ListenAddr:    listenAddr,
 		HandshakeFunc: p2p.NOPhandshakeFunc,
 		Decoder:       p2p.DefaultDecoder{},
-		// OnPeer:        OnPeer,
 	}
-
-	tr := p2p.NewTCPTransport(tcpOpts)
+	tcpTransport := p2p.NewTCPTransport(tcpOpts)
 
 	fileServerOpts := FileServerOpts{
-		StorageRoot:      ":3000_network",
+		StorageRoot:      listenAddr[1:] + "quantumsyncnetwork",
 		PathTansformFunc: CASPathTransformFunc,
-		Transport:        tr,
+		Transport:        tcpTransport,
+		BootstrapNodes:   nodes,
 	}
 	s := NewFileServer(fileServerOpts)
+	tcpTransport.OnPeer = s.OnPeer
 
+	return s
+}
+
+func main() {
+	s1 := makeServer(":3000", "")
+	s2 := makeServer(":4000", ":3000")
+	go func() {
+		log.Fatal(s1.Start())
+	}()
+	time.Sleep(2 * time.Second)
+
+	go s2.Start()
+	time.Sleep(2 * time.Second)
+
+	data := bytes.NewReader([]byte("My file is here !"))
+	s2.StoreData("myPrivateData", data)
+
+	select {}
 	// go func() {
 	// 	msg := <-tr.Consume()
 	// 	fmt.Printf("%+v\n", msg)
 	// }()
-	go func() {
-		time.Sleep(time.Second * 10)
-		s.Stop()
-	}()
+	// go func() {
+	// 	time.Sleep(time.Second * 10)
+	// 	s.Stop()
+	// }()
 
-	if err := s.Start(); err != nil {
-		log.Fatal(err)
-	}
+	// if err := s.Start(); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 }

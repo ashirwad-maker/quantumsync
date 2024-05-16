@@ -21,8 +21,8 @@ type DefaultDecoder struct{}
 // net.Conn and io.Reader have the same function signatute of Read function therefore they
 // can be used interchanebily , this is know as interface substitution.
 func (dec DefaultDecoder) Decode(r io.Reader, rpc *RPC) error {
-	buf := make([]byte, 1024)
-	n, err := r.Read(buf)
+	buf := make([]byte, 2048)
+	n, err := r.Read(buf) // blocking call mmove forward after reading from io reader.
 	if err != nil {
 		return err
 	}
