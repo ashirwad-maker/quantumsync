@@ -27,5 +27,6 @@ func (dec DefaultDecoder) Decode(r io.Reader, rpc *RPC) error {
 		return err
 	}
 	rpc.Payload = buf[:n]
+	// log.Printf("Msg encoded is :%s\n", string(rpc.Payload))
 	return nil
 }
