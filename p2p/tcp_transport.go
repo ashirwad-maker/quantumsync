@@ -150,12 +150,12 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 		}
 		rpc.From = conn.RemoteAddr().String() // Storing the address of a endpoint in the network
 		peer.Wg.Add(1)
-		log.Printf("Waiting till stream is done\n")
-
+		fmt.Printf("Waiting till stream is done %s\n", t.ListenAddr)
 		t.rpcch <- rpc
+
+		// Mutex is used, to block the Read Loop, so that handleMessage in server
 		peer.Wg.Wait()
-		log.Printf("Stream is done\n")
-		// log.Printf("message : %+v\n", rpc)
+		fmt.Printf("Stream is done\n")
 	}
 
 }

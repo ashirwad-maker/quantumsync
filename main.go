@@ -48,9 +48,21 @@ func main() {
 	go s2.Start()
 	time.Sleep(2 * time.Second)
 
-	data := bytes.NewReader([]byte("My file is here"))
-	s2.StoreData("myPrivateData", data)
-
+	data := bytes.NewReader([]byte("my big data file here!"))
+	s2.Store("myPrivateData", data)
+	// r, err := s2.Get("myPrivateData")
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	// if err == nil {
+	// 	b, err := ioutil.ReadAll(r)
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 	}
+	// 	if err == nil {
+	// 		fmt.Println(string(b))
+	// 	}
+	// }
 	select {}
 	// go func() {
 	// 	msg := <-tr.Consume()

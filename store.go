@@ -108,7 +108,7 @@ func (s *Store) Has(key string) bool {
 	return !errors.Is(err, os.ErrNotExist)
 }
 
-func (s *Store) Write(key string, r io.Reader) error {
+func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
@@ -131,25 +131,27 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	return os.Open(fullPathWithRoot)
 }
 
-func (s *Store) writeStream(key string, r io.Reader) error {
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	pathKey := s.PathTansformFunc(key)
 	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.PathName)
 
 	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return err
+		return 0, err
 	}
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
 
 	f, err := os.Create(fullPathWithRoot)
 	if err != nil {
-		return err
+		return 0, err
 	}
+	// io.Copy() keeps on copying from the souce till the EOF is not found, leading to a blocking and disallowing streaming.
+	// Therefor a io.LimitReader is passed while calling.
 	n, err := io.Copy(f, r)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	f.Close()
 	log.Printf("written (%d) bytes to disk : %s", n, fullPathWithRoot)
 
-	return nil
+	return n, nil
 }
