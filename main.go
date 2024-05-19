@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"log"
+	"fmt"
 	"time"
 
 	"github.com/ashirwad-maker/quantumsync/p2p"
@@ -41,15 +41,17 @@ func main() {
 	s1 := makeServer(":3000", "")
 	s2 := makeServer(":4000", ":3000")
 	go func() {
-		log.Fatal(s1.Start())
+		s1.Start()
 	}()
 	time.Sleep(2 * time.Second)
 
 	go s2.Start()
 	time.Sleep(2 * time.Second)
 
-	data := bytes.NewReader([]byte("my big data file here!"))
-	s2.Store("myPrivateData", data)
+	for c := 0; c < 100; c++ {
+		data := bytes.NewReader([]byte("my big data file here!"))
+		s2.Store(fmt.Sprintf("myPrivateData_%d", c), data)
+	}
 	// r, err := s2.Get("myPrivateData")
 	// if err != nil {
 	// 	log.Println(err)

@@ -20,15 +20,19 @@ type TCPPeer struct {
 
 	// We are reading from the conn in the handleConn function and we are also reading it in the
 	// loop function from the peer, which are basically the same connection, so to avoid race conditions we are using a waitgroup.
-	Wg *sync.WaitGroup
+	wg *sync.WaitGroup
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
-		Wg:       &sync.WaitGroup{},
+		wg:       &sync.WaitGroup{},
 	}
+}
+
+func (peer *TCPPeer) CloseStream() {
+	peer.wg.Done()
 }
 
 func (peer *TCPPeer) Send(b []byte) error {
@@ -59,6 +63,10 @@ func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 		TCPTransportOpts: opts,
 		rpcch:            make(chan RPC),
 	}
+}
+
+func (t *TCPTransport) Addr() string {
+	return t.ListenAddr
 }
 
 // Consume() only reads from the channel for reading the incoming message
@@ -136,26 +144,30 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 	}
 
 	// Read Loop
-	rpc := RPC{}
 	for {
-
+		rpc := RPC{}
 		// If the peer is closed then this loop should end/return
 		// otherwise if it is a decoder error then it should be keep on going.
 
 		// Note that the message is being decoded in rpc.PayLoad which is a slice of bytes.
+		log.Printf("Start of the Read loop of (%s)\n", t.ListenAddr)
 		err = t.Decoder.Decode(conn, &rpc)
 		if err != nil {
 			fmt.Printf("TCP error:  %s\n", err)
 			return
 		}
 		rpc.From = conn.RemoteAddr().String() // Storing the address of a endpoint in the network
-		peer.Wg.Add(1)
-		fmt.Printf("Waiting till stream is done %s\n", t.ListenAddr)
-		t.rpcch <- rpc
+		if rpc.Stream {
+			peer.wg.Add(1)
+			log.Printf("Incoming stream from (%s) to (%s), waiting .....\n", rpc.From, t.ListenAddr)
+			peer.wg.Wait()
+			log.Printf("Stream is done\n")
+			continue // Once the streaming is done no need to pass it to the channel.
+		}
 
-		// Mutex is used, to block the Read Loop, so that handleMessage in server
-		peer.Wg.Wait()
-		fmt.Printf("Stream is done\n")
+		t.rpcch <- rpc
+		log.Printf("End of the Read loop of (%s) \n", t.ListenAddr)
+
 	}
 
 }

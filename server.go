@@ -41,6 +41,8 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 	}
 }
 
+var y int = 0
+
 type Message struct {
 	Payload any
 }
@@ -56,10 +58,11 @@ type MessageGetFile struct {
 
 func (s *FileServer) Get(key string) (io.Reader, error) {
 	if s.store.Has(key) {
+		fmt.Printf("[%s] serving file (%s) from local disk", s.Transport.Addr(), key)
 		return s.store.Read(key)
 	}
 
-	fmt.Printf("Don't have the file (%s) locally, fetching from network\n", key)
+	fmt.Printf("[%s] Don't have the file (%s) locally, fetching from network\n", s.Transport.Addr(), key)
 
 	msg := Message{
 		Payload: MessageGetFile{
@@ -69,6 +72,7 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 	if err := s.broadcast(&msg); err != nil {
 		return nil, err
 	}
+	time.Sleep(500 * time.Millisecond)
 	select {}
 	return nil, nil
 }
@@ -104,6 +108,8 @@ func (s *FileServer) broadcast(msg *Message) error {
 	}
 
 	for _, peer := range s.peers {
+		peer.Send([]byte{p2p.IncomingMessage})
+		time.Sleep(5 * time.Millisecond)
 		if err := peer.Send(msgBuf.Bytes()); err != nil {
 			return err
 		}
@@ -140,15 +146,17 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		return err
 	}
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Millisecond * 5)
 	// Here waiting is necessary as it will send the messages at the same instant, that can cause problem.
 
 	for _, peer := range s.peers {
+		peer.Send([]byte{p2p.IncomingStream})
+		time.Sleep(time.Millisecond * 5)
 		n, err := io.Copy(peer, fileBuffer)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("recieved and written %d bytes to disk\n", n)
+		log.Printf("recieved and written %d bytes to disk\n", n)
 	}
 
 	return nil
@@ -217,7 +225,6 @@ func (s *FileServer) handleMessage(from string, msg *Message) error {
 }
 
 func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error {
-	log.Printf("entering handleGetMessagge\n")
 	if !s.store.Has(msg.Key) {
 		return fmt.Errorf("need to serve the file (%s) but it does not exist on the disk", msg.Key)
 	}
@@ -239,9 +246,9 @@ func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error
 
 	return nil
 }
-
 func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) error {
 
+	log.Printf(" Entering Handle Message Store of -> %s\n", s.Transport.Addr())
 	peer, ok := s.peers[from]
 	if !ok {
 		return fmt.Errorf("peer (%s) could not be found", from)
@@ -249,12 +256,15 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 
 	// Here after the broadcasting the message is read, and stored in the file.
 	// The io.Limiter is used with a net.Conn object (peer) asking it to read msg.size bytes.
-	n, err := s.store.Write(msg.Key, io.LimitReader(peer, msg.Size))
+	_, err := s.store.Write(msg.Key, io.LimitReader(peer, msg.Size))
 	if err != nil {
 		return err
 	}
-	fmt.Printf("written %d bytes to disk\n", n)
-	peer.(*p2p.TCPPeer).Wg.Done()
+	// log.Printf("(%s) written %d bytes to disk\n", s.Transport.Addr, n)
+
+	log.Printf(" Closing the Stream \n")
+
+	peer.CloseStream()
 	return nil
 }
 
