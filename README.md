@@ -25,6 +25,7 @@ The first arg of makeServer() is the listenAddress to which the server will be l
 ``` go
     server.Start()
 ```
+``Start()`` starts and bootstraps the server, making it available for incoming connections and sharing data. 
 
 #### Storing data on the server
 ``` go
