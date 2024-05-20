@@ -67,7 +67,7 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 
 	msg := Message{
 		Payload: MessageGetFile{
-			Key: key,
+			Key: hashKey(key),
 		},
 	}
 	if err := s.broadcast(&msg); err != nil {
@@ -103,17 +103,6 @@ func (s *FileServer) stream(msg *Message) error {
 		// con.Write() take slice of bytes in input
 		peer.Send(buf.Bytes())
 	}
-
-	// Since Peer Interface embeds the Conn interface, which also implements the
-	// writer, reader interface so peers can be a slice of io.writer and pass this to the encoder
-	// peers := []io.Writer{}
-	// for _, peer := range s.peers {
-	// 	peers = append(peers, peer)
-	// }
-	// mw := io.MultiWriter(peers...)
-
-	// It will encode the payload p and will write on mw. Note here a conn.Write() action is happ
-	// return gob.NewEncoder(mw).Encode(p)
 	return nil
 }
 
@@ -152,7 +141,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	msg := Message{
 		Payload: MessageStoreFile{
-			Key:  key,
+			Key:  hashKey(key),
 			Size: size + 16,
 		},
 	}
