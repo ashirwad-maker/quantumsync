@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"io/ioutil"
+	"log"
 	"time"
 
 	"github.com/ashirwad-maker/quantumsync/p2p"
@@ -39,31 +42,25 @@ func main() {
 	go s2.Start()
 	time.Sleep(2 * time.Second)
 
-	// for c := 0; c < 100; c++ {
-	data := bytes.NewReader([]byte("my big data file here!"))
-	s2.Store("myCoolPicture", data)
-	// }
-	// r, err := s2.Get("myCoolPicture")
-	// if err != nil {
-	// 	log.Println(err)
-	// }
-	// b, err := ioutil.ReadAll(r)
-	// if err != nil {
-	// 	log.Println(err)
-	// }
-	// log.Printf("The retrieved adata is %s\n", string(b))
-	select {}
-	// go func() {
-	// 	msg := <-tr.Consume()
-	// 	fmt.Printf("%+v\n", msg)
-	// }()
-	// go func() {
-	// 	time.Sleep(time.Second * 10)
-	// 	s.Stop()
-	// }()
+	for c := 0; c < 20; c++ {
+		key := fmt.Sprintf("myCoolPicture_%d", c)
+		data := bytes.NewReader([]byte("my big data file is here!"))
+		s2.Store(key, data)
+		if err := s2.store.Delete(key); err != nil {
+			log.Fatal(err)
+		}
+		r, err := s2.Get(key)
+		if err != nil {
+			log.Fatal(err)
+		}
+		b, err := ioutil.ReadAll(r)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(string(b))
 
-	// if err := s.Start(); err != nil {
-	// 	log.Fatal(err)
-	// }
+	}
+
+	select {}
 
 }

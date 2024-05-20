@@ -161,7 +161,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 			peer.wg.Add(1)
 			log.Printf("Incoming stream from (%s) to (%s), waiting .....\n", rpc.From, t.ListenAddr)
 			peer.wg.Wait()
-			log.Printf("Stream is done\n")
+			log.Printf("Closing the stream\n")
 			continue // Once the streaming is done no need to pass it to the channel.
 		}
 

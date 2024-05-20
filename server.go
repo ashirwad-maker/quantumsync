@@ -14,7 +14,7 @@ import (
 )
 
 type FileServerOpts struct {
-	EncKey           []byte
+	EncKey           []byte // EncKey is used to encrypt and decrypt the data in the file.
 	StorageRoot      string
 	PathTansformFunc PathTansformFunc
 	Transport        p2p.Transport
@@ -80,7 +80,8 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		var fileSize int64
 		binary.Read(peer, binary.LittleEndian, &fileSize)
 
-		n, err := s.store.Write(key, io.LimitReader(peer, fileSize))
+		n, err := s.store.WriteDecrypt(s.EncKey, key, io.LimitReader(peer, fileSize))
+		// n, err := s.store.Write(key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -274,7 +275,7 @@ func (s *FileServer) handleMessageGetFile(from string, msg MessageGetFile) error
 }
 func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) error {
 
-	log.Printf(" Entering Handle Message Store of -> %s\n", s.Transport.Addr())
+	log.Printf("In Process of Storing the file on -> [%s]  ...\n", s.Transport.Addr())
 	peer, ok := s.peers[from]
 	if !ok {
 		return fmt.Errorf("peer (%s) could not be found", from)
@@ -287,8 +288,6 @@ func (s *FileServer) handleMessageStoreFile(from string, msg MessageStoreFile) e
 		return err
 	}
 	// log.Printf("(%s) written %d bytes to disk\n", s.Transport.Addr, n)
-
-	log.Printf(" Closing the Stream \n")
 
 	peer.CloseStream()
 	return nil

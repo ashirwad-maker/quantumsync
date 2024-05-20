@@ -111,6 +111,52 @@ func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
+func (s *Store) openFileForWriting(key string) (*os.File, string, error) {
+	pathKey := s.PathTansformFunc(key)
+	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.PathName)
+	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
+		return nil, "", err
+	}
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
+	f, err := os.Create(fullPathWithRoot)
+	if err != nil {
+		return nil, "", err
+	}
+	return f, fullPathWithRoot, err
+}
+
+func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
+	f, fullPathWithRoot, err := s.openFileForWriting(key)
+	if err != nil {
+		return 0, err
+	}
+	n, err := copyDecrypt(encKey, r, f)
+	if err != nil {
+		return 0, err
+	}
+	log.Printf("written (%d) bytes to disk : %s", n-16, fullPathWithRoot)
+	return ((int64)(n)), nil
+}
+
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
+
+	f, fullPathWithRoot, err := s.openFileForWriting(key)
+	if err != nil {
+		return 0, err
+	}
+
+	// io.Copy() keeps on copying from the souce till the EOF is not found, leading to a blocking and disallowing streaming.
+	// Therefor a io.LimitReader is passed while calling.
+
+	n, err := io.Copy(f, r)
+	if err != nil {
+		return 0, err
+	}
+	f.Close()
+	log.Printf("written (%d) bytes to disk : %s", n, fullPathWithRoot)
+	return n, nil
+}
+
 func (s *Store) Read(key string) (int64, io.Reader, error) {
 	return s.readStream(key)
 }
@@ -118,7 +164,6 @@ func (s *Store) Read(key string) (int64, io.Reader, error) {
 func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 	pathkey := s.PathTansformFunc(key)
 	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathkey.FullPath())
-
 	fi, err := os.Stat(fullPathWithRoot)
 	if err != nil {
 		return 0, nil, err
@@ -128,30 +173,4 @@ func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 		return 0, nil, err
 	}
 	return fi.Size(), file, nil
-
-}
-
-func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
-	pathKey := s.PathTansformFunc(key)
-	pathNameWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.PathName)
-
-	if err := os.MkdirAll(pathNameWithRoot, os.ModePerm); err != nil {
-		return 0, err
-	}
-	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
-
-	f, err := os.Create(fullPathWithRoot)
-	if err != nil {
-		return 0, err
-	}
-	// io.Copy() keeps on copying from the souce till the EOF is not found, leading to a blocking and disallowing streaming.
-	// Therefor a io.LimitReader is passed while calling.
-	n, err := io.Copy(f, r)
-	if err != nil {
-		return 0, err
-	}
-	f.Close()
-	log.Printf("written (%d) bytes to disk : %s", n, fullPathWithRoot)
-
-	return n, nil
 }
