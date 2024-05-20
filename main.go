@@ -1,8 +1,7 @@
 package main
 
 import (
-	"io/ioutil"
-	"log"
+	"bytes"
 	"time"
 
 	"github.com/ashirwad-maker/quantumsync/p2p"
@@ -17,6 +16,7 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 	tcpTransport := p2p.NewTCPTransport(tcpOpts)
 
 	fileServerOpts := FileServerOpts{
+		EncKey:           newEncryptionKey(),
 		StorageRoot:      listenAddr[1:] + "quantumsyncnetwork",
 		PathTansformFunc: CASPathTransformFunc,
 		Transport:        tcpTransport,
@@ -40,18 +40,18 @@ func main() {
 	time.Sleep(2 * time.Second)
 
 	// for c := 0; c < 100; c++ {
-	//data := bytes.NewReader([]byte("my big data file here!"))
-	//s2.Store("myCoolPicture", data)
+	data := bytes.NewReader([]byte("my big data file here!"))
+	s2.Store("myCoolPicture", data)
 	// }
-	r, err := s2.Get("myCoolPicture")
-	if err != nil {
-		log.Println(err)
-	}
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		log.Println(err)
-	}
-	log.Printf("The retrieved adata is %s\n", string(b))
+	// r, err := s2.Get("myCoolPicture")
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	// b, err := ioutil.ReadAll(r)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	// log.Printf("The retrieved adata is %s\n", string(b))
 	select {}
 	// go func() {
 	// 	msg := <-tr.Consume()
