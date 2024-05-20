@@ -32,17 +32,23 @@ The first arg of makeServer() is the listenAddress to which the server will be l
 ```
 The ``Store()`` takes two arguments, ``key`` which decides where the file would be stored and ``data`` what needs to be stored.
 
+#### Get the file from server
+``` go
+    server.Get(key)
+```
+The ``Get()`` takes ``key`` and first searches the file on local disk, if present it will return the file, if not found it will broadcast over all it's ``peers`` asking for the file and if present will fetch it over the network.
+
 #### Deleting the data 
 ``` go
     server.Delete(key)
 ```
 The ``Delete()`` takes a single argument which is ``key``, and deletes the file
 
-#### Get the file from server
+#### Clear the whole server
 ``` go
-    server.Get(key)
+    server.Clear()
 ```
-The ``Get()`` takes ``key`` and first searches the file on local disk, if present it will return the file, if not found it will broadcast over all it's ``peers`` asking for the file and if present will fetch it over the network.
+The Clear() deletes all the files present on the server. 
 
 ## Example Usage
 ```go 
