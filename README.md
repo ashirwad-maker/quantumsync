@@ -96,6 +96,6 @@ The Clear() deletes all the files present on the server.
  * ``(3000/4000)/quantumsyncnetwork/``: The number in front(3000/4000) denotes the listening address of the server,and after quantumsyncnetwork it represents the folders, files and data stored in encrypted/decrypted form on that server.   
 
  ## OUTPUT
- Here is a screenshot of how the servers are working, writing, reading and streaming files over the network. The following is the output for ``main.go``
+ Here is a screenshot of how the servers are working, writing, reading, storing and streaming files over the network. The following is the output for ``main.go``
 
  ![QuantumSync](./output.png)
