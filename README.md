@@ -84,6 +84,18 @@ The Clear() deletes all the files present on the server.
 		if err != nil {
 			log.Fatal(err)
 		}
-        fmt.Println(string(b))
+            fmt.Println(string(b))
 	}
 ```
+## Directory/File Structure
+ Here's a brief overview of the project's 
+ * ``p2p/``: Contains the peer-to-peer library implementation, for communicating and sharing files. 
+ * ``crypto.go``: Contains the functions responsible for encryption and decryption of data. 
+ * ``server.go``: Contains all the tasks performed by server, including the one's discussed above. 
+ * ``store.go``: Responsible for reading and writting the data on/from the disk. 
+ * ``(3000/4000)/quantumsyncnetwork/``: The number in front(3000/4000) denotes the listening address of the server,and after quantumsyncnetwork it represents the folders, files and data stored in encrypted/decrypted form on that server.   
+
+ ## OUTPUT
+ Here is a screenshot of how the servers are working, writing, reading and streaming files over the network. The following is the output for ``main.go``
+
+ ![QuantumSync](./output.png)
